@@ -21,8 +21,13 @@ use clap::Clap;
 use num_cpus;
 use ssh2::Session;
 use std::{
+    collections::HashMap,
     fs::File,
     io::{BufReader, prelude::*},
+    sync::{
+        Arc, Mutex,
+        atomic::{AtomicBool, Ordering}
+    },
     net::TcpStream,
 };
 use threadpool::ThreadPool;
@@ -59,24 +64,40 @@ fn main() -> std::io::Result<()> {
     } else { nt };
 
     let pool = ThreadPool::new(num_threads);
+    let host_done = Arc::new(Mutex::new(HashMap::<usize, Arc<AtomicBool>>::new()));
 
-    for host in hosts {
+    for (i, host) in hosts.iter().enumerate() {
+        let thost_done = Arc::clone(&host_done);
+        let mut thost_done = thost_done.lock().unwrap();
+        thost_done.insert(i, Arc::new(AtomicBool::new(false)));
+        std::mem::drop(thost_done);
+
         let wordlist = wordlist.clone();
-        pool.execute(move || {
-            let curhost = host.clone();
+        for combo in wordlist {
+            let host_done = host_done.clone();
+            let host = host.clone();
+            pool.execute(move || {
+                let host_done0 = host_done.clone();
+                let host_done0 = host_done0.lock().unwrap();
+                if host_done0.get(&i).unwrap().load(Ordering::Relaxed) {
+                    return;
+                }
+                std::mem::drop(host_done0);
 
-            for combo in wordlist {
-                let res = auth_ssh(&curhost, &combo[0], &combo[1]);
+                let res = auth_ssh(&host, &combo[0], &combo[1]);
 
+                let host_done1 = host_done.clone();
+                let host_done1 = host_done1.lock().unwrap();
+                let host_status = host_done1.get(&i).unwrap();
 
                 if res.is_ok() {
-                    println!("PASSED Host: {}, Combo: {}:{}", &curhost, &combo[0], &combo[1]);
-                    break;
-                } else if verbose {
-                    println!("FAILED Host: {}, Combo: {}:{}, Cause: {}",  &curhost, &combo[0], &combo[1], res.err().unwrap());
+                    println!("PASSED Host: {}, Combo: {}:{}", &host, &combo[0], &combo[1]);
+                    host_status.store(true, Ordering::Relaxed);
+                } else if verbose && !host_status.load(Ordering::Relaxed) {
+                    println!("FAILED Host: {}, Combo: {}:{}, Cause: {}",  &host, &combo[0], &combo[1], res.err().unwrap());
                 }
-            }
-        });
+            })
+        }
     }
 
     pool.join();
