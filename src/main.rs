@@ -18,6 +18,7 @@ mod args;
 use args::Args;
 
 use clap::Clap;
+use itertools::Itertools;
 use num_cpus;
 use ssh2::Session;
 use std::{
@@ -42,6 +43,7 @@ fn main() -> std::io::Result<()> {
     BufReader::new(host_list_f)
         .lines()
         .map(|l| l.expect("Could not load hosts"))
+        .unique()
         .collect();
 
     let wordlist_f = File::open(&args.wordlist)?;
