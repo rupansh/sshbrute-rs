@@ -1,6 +1,6 @@
 # sshbrute-rs
 
-[![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue?style=for-the-badge&logo=apache)](https://www.gnu.org/licenses/gpl-3.0)
+[![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue?style=for-the-badge&logo=apache)](https://www.apache.org/licenses/LICENSE-2.0.html)
 [![RUST](https://img.shields.io/badge/made%20with-RUST-red.svg?style=for-the-badge&logo=rust)](https://www.rust-lang.org/)
 
 ```
