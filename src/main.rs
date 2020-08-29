@@ -22,7 +22,6 @@ use itertools::Itertools;
 use num_cpus;
 use ssh2::Session;
 use std::{
-    collections::HashMap,
     fs::File,
     io::{BufReader, prelude::*},
     sync::{
@@ -66,7 +65,7 @@ fn main() -> std::io::Result<()> {
     } else { nt };
 
     let pool = ThreadPool::new(num_threads);
-    let host_done = Arc::new(Mutex::new(HashMap::<usize, Arc<AtomicBool>>::new()));
+    let host_done = Arc::new(Mutex::new(Vec::<Arc<AtomicBool>>::new()));
 
     for (i, host) in hosts.iter().enumerate() {
         let thost_done = Arc::clone(&host_done);
@@ -81,7 +80,7 @@ fn main() -> std::io::Result<()> {
             pool.execute(move || {
                 let host_done0 = host_done.clone();
                 let host_done0 = host_done0.lock().unwrap();
-                if host_done0.get(&i).unwrap().load(Ordering::Relaxed) {
+                if host_done0[i].load(Ordering::Relaxed) {
                     return;
                 }
                 std::mem::drop(host_done0);
@@ -90,7 +89,7 @@ fn main() -> std::io::Result<()> {
 
                 let host_done1 = host_done.clone();
                 let host_done1 = host_done1.lock().unwrap();
-                let host_status = host_done1.get(&i).unwrap();
+                let host_status = &host_done1[i];
 
                 if res.is_ok() {
                     println!("PASSED Host: {}, Combo: {}:{}", &host, &combo[0], &combo[1]);
