@@ -25,7 +25,7 @@ use std::{
     fs::File,
     io::{BufReader, prelude::*},
     sync::{
-        Arc, Mutex,
+        Arc,
         atomic::{AtomicBool, Ordering}
     },
     net::TcpStream,
@@ -65,36 +65,25 @@ fn main() -> std::io::Result<()> {
     } else { nt };
 
     let pool = ThreadPool::new(num_threads);
-    let host_done = Arc::new(Mutex::new(Vec::<Arc<AtomicBool>>::new()));
+    let host_done: Arc<Vec<AtomicBool>> = Arc::new((0..hosts.len()).map(|_| AtomicBool::new(false)).collect());
 
     for (i, host) in hosts.iter().enumerate() {
-        let thost_done = Arc::clone(&host_done);
-        let mut thost_done = thost_done.lock().unwrap();
-        thost_done.insert(i, Arc::new(AtomicBool::new(false)));
-        std::mem::drop(thost_done);
-
         let wordlist = wordlist.clone();
         for combo in wordlist {
-            let host_done = host_done.clone();
             let host = host.clone();
+            let host_d = host_done.clone();
             pool.execute(move || {
-                let host_done0 = host_done.clone();
-                let host_done0 = host_done0.lock().unwrap();
-                if host_done0[i].load(Ordering::Relaxed) {
+                let done = &host_d[i];
+                if done.load(Ordering::SeqCst) {
                     return;
                 }
-                std::mem::drop(host_done0);
 
                 let res = auth_ssh(&host, &combo[0], &combo[1]);
 
-                let host_done1 = host_done.clone();
-                let host_done1 = host_done1.lock().unwrap();
-                let host_status = &host_done1[i];
-
                 if res.is_ok() {
                     println!("PASSED Host: {}, Combo: {}:{}", &host, &combo[0], &combo[1]);
-                    host_status.store(true, Ordering::Relaxed);
-                } else if verbose && !host_status.load(Ordering::Relaxed) {
+                    done.store(true, Ordering::SeqCst);
+                } else if verbose && !done.load(Ordering::SeqCst) {
                     println!("FAILED Host: {}, Combo: {}:{}, Cause: {}",  &host, &combo[0], &combo[1], res.err().unwrap());
                 }
             })
