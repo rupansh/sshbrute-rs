@@ -65,7 +65,7 @@ fn main() -> std::io::Result<()> {
     } else { nt };
 
     let pool = ThreadPool::new(num_threads);
-    let host_done: Arc<Vec<AtomicBool>> = Arc::new((0..hosts.len()).map(|_| AtomicBool::new(false)).collect());
+    let host_done: Arc<[AtomicBool]> = (0..hosts.len()).map(|_| AtomicBool::new(false)).collect::<Vec<AtomicBool>>().into();
 
     for (i, host) in hosts.iter().enumerate() {
         let wordlist = wordlist.clone();
